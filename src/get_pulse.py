@@ -93,9 +93,10 @@ class getPulseApp(object):
         self.video = cv2.VideoCapture('video1.avi')
         #self.video.set(cv2.CAP_PROP_FPS, 16)
 
+        self.csvn = "Webcam-pulse"
+
         fps = self.video.get(cv2.CAP_PROP_FPS)
         print "Frames per second using video.get(cv2.CAP_PROP_FPS) : {0}".format(fps)
-
 
 
     def toggle_cam(self):
@@ -108,6 +109,8 @@ class getPulseApp(object):
 
     def toggle_video(self):
         self.video_flag = not self.video_flag
+        self.toggle_search()
+        self.processor.start_save_bpm()
         return self.video_flag
 
     def write_csv(self):
@@ -127,7 +130,8 @@ class getPulseApp(object):
         Locking the forehead location in place significantly improves
         data quality, once a forehead has been sucessfully isolated.
         """
-        self.write_csv()
+        #Reset processors times.
+        self.processor.times = []
         state = self.processor.find_faces_toggle()
         #print("face detection lock =", not state)
 
@@ -203,8 +207,15 @@ class getPulseApp(object):
         Single iteration of the application's main loop.
         """
 
+        #self.video = cv2.VideoCapture('video1.avi')
+
         #This is where we feed the video
         if self.video_flag:
+
+            # Update .csv
+            #data = np.vstack((self.processor.times, self.processor.samples)).T
+            data = np.vstack((self.processor.ttimes, self.processor.bpms)).T
+            np.savetxt(self.csvn + ".csv", data, delimiter=',')
             ret, frame = self.video.read()
 
             if(ret == False):
@@ -214,7 +225,6 @@ class getPulseApp(object):
         else:
             # Get current image frame from the camera
             frame = self.cameras[self.selected_cam].get_frame()
-
 
         self.h, self.w, _c = frame.shape
 
@@ -227,6 +237,7 @@ class getPulseApp(object):
         self.processor.run(self.selected_cam)
         # collect the output frame for display
         output_frame = self.processor.frame_out
+
 
         # show the processed/annotated output frame
         imshow("Processed", output_frame)
