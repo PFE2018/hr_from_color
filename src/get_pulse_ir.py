@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 import rospy
 from std_msgs.msg import String
@@ -30,6 +29,7 @@ class getPulseApp(object):
     """
 
     def __init__(self, args):
+
         # Imaging device - must be a connected camera (not an ip camera or mjpeg
         # stream)
         serial = args.serial
@@ -104,7 +104,8 @@ class getPulseApp(object):
         #Creates a blank image of 200x200 size to initialise self.irframe
         blank_image = np.zeros((400, 400, 3), np.uint8)
         self.irframe = blank_image
-
+        #self.irframe = None
+        self.callbackFlag = False
 
     def toggle_cam(self):
         if len(self.cameras) > 1:
@@ -174,31 +175,30 @@ class getPulseApp(object):
                name=self.plot_title,
                bg=self.processor.slices[0])
 
+    def ir_callback(self, msg):
+        self.callbackFlag = True
+        msg.encoding = "mono16"
+        #Convert ROS image to opencv image.
+        try:
+            bridge = CvBridge()
+            #Need to change encoding
+            self.irframe = bridge.imgmsg_to_cv2(msg, "bgr8")
+
+        except CvBridgeError as e:
+            print(e)
 
     def hrmethode1(self):
         pub = rospy.Publisher('chatter', String, queue_size=10)
         rospy.init_node('hrmethode1', anonymous=True)
+        irRectSub = rospy.Subscriber("/kinect2/sd/image_ir_rect", Image, self.ir_callback)
         rate = rospy.Rate(10)  # 10hz
-        sub = rospy.Subscriber("/kinect2/sd/image_ir", Image, self.set_ir)
 
         while not rospy.is_shutdown():
             self.main_loop()
             heartrate = self.processor.bpm
             rospy.loginfo("Heartrate = " + format(heartrate))
             pub.publish("Heartrate = " + format(heartrate))
-            # rospy.spin()
             rate.sleep()
-
-    def set_ir(self, msg):
-        msg.encoding = "mono16"
-        #Convert ROS image to opencv image.
-        try:
-            bridge = CvBridge()
-            #Need to change encoding
-            self.irframe = bridge.imgmsg_to_cv2(msg, "mono8")
-            print('hello')
-        except CvBridgeError as e:
-            print(e)
 
     def key_handler(self):
         """
@@ -226,7 +226,8 @@ class getPulseApp(object):
         Single iteration of the application's main loop.
         """
 
-        #self.video = cv2.VideoCapture('video1.avi')
+        self.video = cv2.VideoCapture('video1.avi')
+        videoframe = self.video.read()
 
         #This is where we feed the video
         if self.video_flag:
@@ -245,6 +246,9 @@ class getPulseApp(object):
             # Get current image frame from the camera
             frame = self.irframe
             #frame = self.cameras[self.selected_cam].get_frame()
+
+        if self.callbackFlag:
+            frame = self.irframe
 
         self.h, self.w, _c = frame.shape
 
