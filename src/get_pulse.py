@@ -14,6 +14,7 @@ import time
 from serial import Serial
 import socket
 import sys
+import matplotlib.pyplot as plt
 
 
 class getPulseApp(object):
@@ -90,7 +91,8 @@ class getPulseApp(object):
                              "f": self.write_csv,
                              "v": self.toggle_video}
 
-        self.video = cv2.VideoCapture('video1.avi')
+        self.video = cv2.VideoCapture('789/video1.avi')
+        self.videoTimes = []
         #self.video.set(cv2.CAP_PROP_FPS, 16)
 
         self.csvn = "Webcam-pulse"
@@ -171,7 +173,7 @@ class getPulseApp(object):
     def hrmethode1(self):
         pub = rospy.Publisher('chatter', String, queue_size=10)
         rospy.init_node('hrmethode1', anonymous=True)
-        rate = rospy.Rate(10)  # 10hz
+        rate = rospy.Rate(61)  # 10hz
 
         while not rospy.is_shutdown():
             self.main_loop()
@@ -212,13 +214,34 @@ class getPulseApp(object):
         #This is where we feed the video
         if self.video_flag:
 
+            plt.figure(1)
+            plt.plot(self.processor.ttimes, self.processor.bpms)
+
             # Update .csv
             #data = np.vstack((self.processor.times, self.processor.samples)).T
             data = np.vstack((self.processor.ttimes, self.processor.bpms)).T
+            #data = np.vstack((self.videoTimes, self.processor.bpms)).T
             np.savetxt(self.csvn + ".csv", data, delimiter=',')
+
             ret, frame = self.video.read()
 
-            if(ret == False):
+            if self.processor.saveBpm:
+
+                timestamp = self.video.get(cv2.CAP_PROP_POS_MSEC)/1000.0
+                bpmCount = np.size(self.processor.bpms)
+
+                #Means the BPM acquisition has started and we should keep timestamps of frame.
+                if np.size(self.processor.bpms) > 0:
+                    self.videoTimes.append(timestamp)
+
+                timestampCount = np.size(self.videoTimes)
+
+                #print("Frame timestamps count: " + format(timestampCount))
+                #print("BPMs saved count: " + format(bpmCount))
+                gTruth = np.vstack((self.videoTimes, self.processor.bpms)).T
+                np.savetxt("test.csv", gTruth, delimiter=',')
+
+            if ret == False:
                  self.video = cv2.VideoCapture('video1.avi')
                  ret, frame = self.video.read()
 
